@@ -1,0 +1,107 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+public interface IStorage<T>
+{
+    T GetItem(int index);
+    void AddItem(T item);
+    void RemoveItem(int index);
+    event Action<T> ItemChanged;
+}
+
+public class StorageException : Exception
+{
+    public StorageException(string message) : base(message) { }
+}
+
+public class Storage<T> : IStorage<T>
+{
+    private List<T> items;
+    public event Action<T> ItemChanged;
+
+    public Storage(IEnumerable<T> items)
+    {
+        this.items = new List<T>(items);
+    }
+
+    public T GetItem(int index)
+    {
+        if (index < 0 || index >= items.Count)
+            throw new StorageException($"Index {index} is out of bounds.");
+        return items[index];
+    }
+
+    public void AddItem(T item)
+    {
+        items.Add(item);
+        ItemChanged?.Invoke(item);
+    }
+
+    public void RemoveItem(int index)
+    {
+        if (index < 0 || index >= items.Count)
+            throw new StorageException($"Cannot remove item at index {index}.");
+        T removedItem = items[index];
+        items.RemoveAt(index);
+        ItemChanged?.Invoke(removedItem);
+    }
+
+    public T this[int index]
+    {
+        get => GetItem(index);
+        set
+        {
+            if (index < 0 || index >= items.Count)
+                throw new StorageException($"Index {index} is out of bounds.");
+            items[index] = value;
+            ItemChanged?.Invoke(value);
+        }
+    }
+
+    public async Task PrintAllItemsAsync()
+    {
+        await Task.Run(() =>
+        {
+            Console.WriteLine("Current Storage Items:");
+            foreach (var item in items)
+            {
+                Console.WriteLine(item);
+            }
+        });
+    }
+}
+
+class Program
+{
+    static async Task Main()
+    {
+        var storage = new Storage<string>(new List<string> { "Lo-Fi", "RetroWave", "Phonk" });
+        storage.ItemChanged += (item) => Console.WriteLine($"Item changed: {item}");
+
+        Console.WriteLine("Initial values:");
+        await storage.PrintAllItemsAsync();
+
+        storage[1] = "SynthWave";
+        Console.WriteLine("Updated values:");
+        await storage.PrintAllItemsAsync();
+
+        storage.AddItem("ChillStep");
+        Console.WriteLine("After adding new item:");
+        await storage.PrintAllItemsAsync();
+
+        storage.RemoveItem(0);
+        Console.WriteLine("After removing the first item:");
+        await storage.PrintAllItemsAsync();
+
+        try
+        {
+            Console.WriteLine("Attempting to access out-of-bounds index:");
+            Console.WriteLine(storage.GetItem(10));
+        }
+        catch (StorageException ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+}
